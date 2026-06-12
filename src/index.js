@@ -10,6 +10,7 @@ const produtosRoutes = require('./routes/produtos');
 const carrinhoRoutes = require('./routes/carrinho');
 const avaliacoesRoutes = require('./routes/avaliacoes');
 const trocasRoutes = require('./routes/trocas');
+const notificacoesRoutes = require('./routes/notificacoes');
 
 const app = express();
 
@@ -36,6 +37,8 @@ app.use('/api/produtos', produtosRoutes);
 app.use('/api/carrinho', carrinhoRoutes);
 app.use('/api/avaliacoes', avaliacoesRoutes);
 app.use('/api/trocas', trocasRoutes);
+app.use('/api/notificacoes', notificacoesRoutes);
+
 
 app.use((req, res, next) => {
     res.status(404).json({
