@@ -3,13 +3,13 @@ const router = express.Router();
 const { supabase } = require('../../data/supabase.js');
 const { verificarToken } = require('../middlewares/auth.js');
 
+// Listar todos os produtos (qualquer pessoa vê)
 router.get('/', async (req, res) => {
     const { categoria, busca, minPreco, maxPreco, tipo_oferta } = req.query;
     
     let query = supabase
-        .from('produtos')
-        .select('*, usuario:user_id(email, raw_user_meta_data)')
-        .eq('disponivel', true);
+        .from('produtos_com_vendedor')
+        .select('*');
     
     if (categoria && categoria !== 'todos') {
         query = query.eq('categoria', categoria);
@@ -40,12 +40,13 @@ router.get('/', async (req, res) => {
     res.json(data);
 });
 
+// Buscar produto por ID (qualquer pessoa vê)
 router.get('/:id', async (req, res) => {
     const { id } = req.params;
     
     const { data, error } = await supabase
-        .from('produtos')
-        .select('*, usuario:user_id(email, raw_user_meta_data)')
+        .from('produtos_com_vendedor')
+        .select('*')
         .eq('id', id)
         .single();
     
@@ -56,6 +57,7 @@ router.get('/:id', async (req, res) => {
     res.json(data);
 });
 
+// Criar novo produto (só quem está logado)
 router.post('/', verificarToken, async (req, res) => {
     const { titulo, descricao, categoria, selecao, ano, preco, tipo_oferta, tamanho, estado, imagem_url, quantidade_estoque } = req.body;
     
@@ -90,6 +92,7 @@ router.post('/', verificarToken, async (req, res) => {
     res.status(201).json(data);
 });
 
+// Atualizar produto (só o dono)
 router.put('/:id', verificarToken, async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
@@ -122,6 +125,7 @@ router.put('/:id', verificarToken, async (req, res) => {
     res.json(data);
 });
 
+// Deletar produto (só o dono)
 router.delete('/:id', verificarToken, async (req, res) => {
     const { id } = req.params;
     
@@ -151,6 +155,7 @@ router.delete('/:id', verificarToken, async (req, res) => {
     res.json({ message: 'Produto deletado com sucesso' });
 });
 
+// Meus produtos (só quem está logado)
 router.get('/meus/produtos', verificarToken, async (req, res) => {
     const { data, error } = await supabase
         .from('produtos')
