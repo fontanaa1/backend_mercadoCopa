@@ -1,0 +1,192 @@
+// backend/src/routes/enderecos.js
+const express = require('express');
+const router = express.Router();
+const { supabase, supabaseAdmin } = require('../../data/supabase.js');
+
+function getToken(req) {
+    return req.headers.authorization?.split('Bearer ')[1];
+}
+
+async function verificarToken(token) {
+    if (!token) return null;
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) return null;
+    return user;
+}
+
+// GET - Listar endereços do usuário
+router.get('/', async (req, res) => {
+    const token = getToken(req);
+    const user = await verificarToken(token);
+    
+    if (!user) {
+        return res.status(401).json({ error: 'Não autorizado' });
+    }
+    
+    const { data, error } = await supabase
+        .from('enderecos')
+        .select('*')
+        .eq('usuario_id', user.id)
+        .order('principal', { ascending: false });
+    
+    if (error) {
+        return res.status(500).json({ error: error.message });
+    }
+    
+    res.json(data);
+});
+
+// GET - Buscar endereço por ID
+router.get('/:id', async (req, res) => {
+    const token = getToken(req);
+    const user = await verificarToken(token);
+    
+    if (!user) {
+        return res.status(401).json({ error: 'Não autorizado' });
+    }
+    
+    const { id } = req.params;
+    const { data, error } = await supabase
+        .from('enderecos')
+        .select('*')
+        .eq('id', id)
+        .eq('usuario_id', user.id)
+        .single();
+    
+    if (error) {
+        return res.status(404).json({ error: 'Endereço não encontrado' });
+    }
+    
+    res.json(data);
+});
+
+// POST - Criar endereço
+router.post('/', async (req, res) => {
+    const token = getToken(req);
+    const user = await verificarToken(token);
+    
+    if (!user) {
+        return res.status(401).json({ error: 'Não autorizado' });
+    }
+    
+    const { nome_completo, cep, rua, numero, bairro, cidade, estado, complemento, principal } = req.body;
+    
+    if (!nome_completo || !rua || !cidade || !estado) {
+        return res.status(400).json({ error: 'Nome, rua, cidade e estado são obrigatórios' });
+    }
+    
+    // Se este endereço for principal, remover principal dos outros
+    if (principal) {
+        await supabase
+            .from('enderecos')
+            .update({ principal: false })
+            .eq('usuario_id', user.id);
+    }
+    
+    const { data, error } = await supabase
+        .from('enderecos')
+        .insert([{
+            usuario_id: user.id,
+            nome_completo,
+            cep: cep || null,
+            rua,
+            numero: numero || null,
+            bairro: bairro || null,
+            cidade,
+            estado,
+            complemento: complemento || null,
+            principal: principal || false
+        }])
+        .select()
+        .single();
+    
+    if (error) {
+        return res.status(500).json({ error: error.message });
+    }
+    
+    res.status(201).json(data);
+});
+
+// PUT - Atualizar endereço
+router.put('/:id', async (req, res) => {
+    const token = getToken(req);
+    const user = await verificarToken(token);
+    
+    if (!user) {
+        return res.status(401).json({ error: 'Não autorizado' });
+    }
+    
+    const { id } = req.params;
+    const { nome_completo, cep, rua, numero, bairro, cidade, estado, complemento, principal } = req.body;
+    
+    // Verificar se o endereço pertence ao usuário
+    const { data: existing, error: findError } = await supabase
+        .from('enderecos')
+        .select('id')
+        .eq('id', id)
+        .eq('usuario_id', user.id)
+        .single();
+    
+    if (findError || !existing) {
+        return res.status(404).json({ error: 'Endereço não encontrado' });
+    }
+    
+    // Se este endereço for principal, remover principal dos outros
+    if (principal) {
+        await supabase
+            .from('enderecos')
+            .update({ principal: false })
+            .eq('usuario_id', user.id)
+            .neq('id', id);
+    }
+    
+    const { data, error } = await supabase
+        .from('enderecos')
+        .update({
+            nome_completo,
+            cep: cep || null,
+            rua,
+            numero: numero || null,
+            bairro: bairro || null,
+            cidade,
+            estado,
+            complemento: complemento || null,
+            principal: principal || false,
+            updated_at: new Date()
+        })
+        .eq('id', id)
+        .select()
+        .single();
+    
+    if (error) {
+        return res.status(500).json({ error: error.message });
+    }
+    
+    res.json(data);
+});
+
+// DELETE - Remover endereço
+router.delete('/:id', async (req, res) => {
+    const token = getToken(req);
+    const user = await verificarToken(token);
+    
+    if (!user) {
+        return res.status(401).json({ error: 'Não autorizado' });
+    }
+    
+    const { id } = req.params;
+    
+    const { error } = await supabase
+        .from('enderecos')
+        .delete()
+        .eq('id', id)
+        .eq('usuario_id', user.id);
+    
+    if (error) {
+        return res.status(500).json({ error: error.message });
+    }
+    
+    res.json({ message: 'Endereço removido com sucesso' });
+});
+
+module.exports = router;
