@@ -17,7 +17,7 @@ app.use(cors());
 app.use(express.json());
 
 app.get('/', (req, res) => {
-    res.json({ 
+    res.json({
         mensagem: '🏆 Bem-vindo à API do Mercado da Copa!',
         versao: '1.0.0',
         endpoints: {
@@ -50,7 +50,6 @@ app.use((req, res) => {
 });
 
 const PORTA = process.env.PORT || 3000;
-
 app.listen(PORTA, () => {
     console.log('');
     console.log(' ================================');
