@@ -115,8 +115,8 @@ router.delete('/:itemId', async (req, res) => {
     res.json({ message: 'Item removido do carrinho' });
 });
 
-// DELETE - Limpar carrinho
-router.delete('/', async (req, res) => {
+// DELETE - Limpar carrinho inteiro do usuário logado após checkout completo
+router.delete('/limpar/tudo', async (req, res) => {
     const { error } = await supabaseAdmin
         .from('carrinho_itens')
         .delete()
@@ -125,7 +125,7 @@ router.delete('/', async (req, res) => {
     if (error) {
         return res.status(500).json({ error: error.message });
     }
-    res.json({ message: 'Carrinho limpo com sucesso' });
+    res.json({ message: 'Carrinho esvaziado com sucesso' });
 });
 
 module.exports = router;
