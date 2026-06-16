@@ -32,19 +32,19 @@ router.post('/', async (req, res) => {
     // Verificar propriedade
     const { data: produtoSol, error: errSol } = await supabase
         .from('produtos')
-        .select('user_id')
+        .select('usuario_id')
         .eq('id', produto_solicitante_id)
         .single();
-    if (errSol || produtoSol.user_id !== req.user.id) {
+    if (errSol || produtoSol.usuario_id !== req.user.id) {
         return res.status(403).json({ error: 'Você não é dono do produto solicitante' });
     }
 
     const { data: produtoRec, error: errRec } = await supabase
         .from('produtos')
-        .select('user_id')
+        .select('usuario_id')
         .eq('id', produto_receptor_id)
         .single();
-    if (errRec || produtoRec.user_id !== receptor_id) {
+    if (errRec || produtoRec.usuario_id !== receptor_id) {
         return res.status(403).json({ error: 'Produto receptor não pertence ao vendedor informado' });
     }
 
