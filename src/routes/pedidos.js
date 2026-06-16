@@ -22,27 +22,16 @@ router.get('/', async (req, res) => {
     res.json(data || []);
 });
 
-// POST - Criar pedido
+// POST - Criar pedido (sem endereco_id)
 router.post('/', async (req, res) => {
-    const { items, total, forma_pagamento, endereco_id } = req.body;
+    const { items, total, forma_pagamento, endereco_entrega } = req.body;
     if (!items || !items.length || !total) {
         return res.status(400).json({ error: 'Items e total são obrigatórios' });
     }
 
-    let enderecoData = null;
-    if (endereco_id) {
-        const { data: endereco } = await supabase
-            .from('enderecos')
-            .select('*')
-            .eq('id', endereco_id)
-            .eq('usuario_id', req.user.id)
-            .single();
-        enderecoData = endereco;
-    }
-
     const numeroPedido = 'MC-' + new Date().getFullYear() + '-' + Math.floor(Math.random() * 10000).toString().padStart(4, '0');
 
-    // Inserir pedido com supabaseAdmin (SEM endereco_id, apenas endereco_entrega)
+    // Inserir pedido com supabaseAdmin
     const { data: pedido, error: pedidoError } = await supabaseAdmin
         .from('pedidos')
         .insert([{
@@ -51,7 +40,7 @@ router.post('/', async (req, res) => {
             total: total,
             forma_pagamento: forma_pagamento,
             status: 'processando',
-            endereco_entrega: enderecoData  // apenas este campo
+            endereco_entrega: endereco_entrega || null  // <-- agora recebe do frontend
         }])
         .select()
         .single();

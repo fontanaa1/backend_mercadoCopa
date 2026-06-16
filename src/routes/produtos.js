@@ -33,7 +33,7 @@ router.get('/', async (req, res) => {
         return res.status(500).json({ error: error.message });
     }
 
-    // Buscar dados dos usuários (auth.users) para preencher o campo "usuario"
+    // Buscar dados dos usuários para preencher "usuario"
     if (produtos && produtos.length > 0) {
         const userIds = [...new Set(produtos.map(p => p.user_id).filter(id => id))];
         if (userIds.length > 0) {
@@ -67,7 +67,6 @@ router.get('/:id', async (req, res) => {
         return res.status(404).json({ error: 'Produto não encontrado' });
     }
 
-    // Buscar usuário
     if (produto.user_id) {
         const { data: user, error: userError } = await supabase
             .from('auth.users')
@@ -82,7 +81,7 @@ router.get('/:id', async (req, res) => {
     res.json(produto);
 });
 
-// POST - Criar produto (autenticado) - USANDO supabaseAdmin para bypass RLS
+// POST - Criar produto
 router.post('/', verificarToken, async (req, res) => {
     const { titulo, descricao, categoria, selecao, ano, preco, tipo_oferta, tamanho, estado, imagem_url, quantidade_estoque } = req.body;
     
@@ -116,7 +115,7 @@ router.post('/', verificarToken, async (req, res) => {
     res.status(201).json(data);
 });
 
-// PUT - Atualizar produto (autenticado, apenas dono)
+// PUT - Atualizar produto
 router.put('/:id', verificarToken, async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
@@ -147,7 +146,7 @@ router.put('/:id', verificarToken, async (req, res) => {
     res.json(data);
 });
 
-// DELETE - Remover produto (autenticado, apenas dono)
+// DELETE - Remover produto
 router.delete('/:id', verificarToken, async (req, res) => {
     const { id } = req.params;
     
@@ -175,9 +174,9 @@ router.delete('/:id', verificarToken, async (req, res) => {
     res.json({ message: 'Produto deletado com sucesso' });
 });
 
-// GET - Meus produtos (autenticado)
+// GET - Meus produtos (usando supabaseAdmin para garantir retorno)
 router.get('/meus', verificarToken, async (req, res) => {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
         .from('produtos')
         .select('*')
         .eq('user_id', req.user.id)
