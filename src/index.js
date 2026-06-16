@@ -13,7 +13,16 @@ const notificacoesRoutes = require('./routes/notificacoes');
 
 const app = express();
 
-app.use(cors());
+// ── CORS Configuração robusta para produção ──
+app.use(cors({
+    origin: '*', // ou liste suas origens frontend
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Responde imediatamente às requisições OPTIONS (preflight)
+app.options('*', cors());
+
 app.use(express.json());
 
 app.get('/', (req, res) => {
@@ -49,11 +58,18 @@ app.use((req, res) => {
     });
 });
 
-const PORTA = process.env.PORT || 3000;
-app.listen(PORTA, () => {
-    console.log('');
-    console.log(' ================================');
-    console.log(` 🏆 Servidor Mercado da Copa rodando!`);
-    console.log(` Acesso Local: http://localhost:${PORTA}`);
-    console.log(' ================================');
-});
+// ── Inicialização do servidor (local) ──
+// A Vercel NÃO chama app.listen(), por isso só executamos em ambiente de desenvolvimento
+if (process.env.NODE_ENV !== 'production') {
+    const PORTA = process.env.PORT || 3000;
+    app.listen(PORTA, () => {
+        console.log('');
+        console.log(' ================================');
+        console.log(` 🏆 Servidor Mercado da Copa rodando!`);
+        console.log(` Acesso Local: http://localhost:${PORTA}`);
+        console.log(' ================================');
+    });
+}
+
+// ── Exporta o app para a Vercel (serverless) ──
+module.exports = app;
