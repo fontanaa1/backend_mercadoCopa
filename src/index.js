@@ -13,15 +13,15 @@ const notificacoesRoutes = require('./routes/notificacoes');
 
 const app = express();
 
-// ── CORS Configuração robusta para produção ──
+// ── CORS deve vir ANTES de qualquer rota ──
+// Responde a todas as requisições OPTIONS (preflight)
+app.options('*', cors());
+// Permite todas as origens e métodos
 app.use(cors({
-    origin: '*', // ou liste suas origens frontend
+    origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
-
-// Responde imediatamente às requisições OPTIONS (preflight)
-app.options('*', cors());
 
 app.use(express.json());
 
