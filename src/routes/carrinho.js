@@ -5,7 +5,7 @@ const { verificarToken } = require('../middlewares/auth.js');
 
 router.use(verificarToken);
 
-// GET - Listar carrinho (leitura com supabase normal, RLS filtra pelo usuário)
+// GET - Listar carrinho (com proteção contra produto nulo)
 router.get('/', async (req, res) => {
     const { data, error } = await supabase
         .from('carrinho_itens')
@@ -16,11 +16,12 @@ router.get('/', async (req, res) => {
         return res.status(500).json({ error: error.message });
     }
 
-    const total = data.reduce((sum, item) => sum + (item.produto.preco * item.quantidade), 0);
+    // Proteção contra produto deletado
+    const total = data.reduce((sum, item) => sum + (item.produto ? (item.produto.preco * item.quantidade) : 0), 0);
     res.json({ itens: data, total });
 });
 
-// POST - Adicionar item (escrita com supabaseAdmin para bypass RLS)
+// POST - Adicionar item
 router.post('/', async (req, res) => {
     const { produto_id, quantidade } = req.body;
     if (!produto_id) {
@@ -115,7 +116,7 @@ router.delete('/:itemId', async (req, res) => {
     res.json({ message: 'Item removido do carrinho' });
 });
 
-// DELETE - Limpar carrinho inteiro do usuário logado após checkout completo
+// DELETE - Limpar carrinho inteiro
 router.delete('/limpar/tudo', async (req, res) => {
     const { error } = await supabaseAdmin
         .from('carrinho_itens')
