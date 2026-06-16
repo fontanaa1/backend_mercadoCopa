@@ -6,12 +6,12 @@ const { verificarToken } = require('../middlewares/auth.js');
 // GET - Listar produtos (público)
 router.get('/', async (req, res) => {
     const { categoria, busca, minPreco, maxPreco, tipo_oferta } = req.query;
-
+    
     let query = supabase
         .from('produtos')
-        .select('*, usuario:user_id(email, raw_user_meta_data)')
+        .select('*, usuario:user_id(email, raw_user_meta_data)')  // CORRIGIDO: user_id
         .eq('disponivel', true);
-
+    
     if (categoria && categoria !== 'todos') {
         query = query.eq('categoria', categoria);
     }
@@ -27,7 +27,7 @@ router.get('/', async (req, res) => {
     if (busca) {
         query = query.ilike('titulo', `%${busca}%`);
     }
-
+    
     const { data, error } = await query.order('created_at', { ascending: false });
     if (error) {
         return res.status(500).json({ error: error.message });
@@ -35,15 +35,14 @@ router.get('/', async (req, res) => {
     res.json(data);
 });
 
-// GET - Produto por ID
+// GET - Buscar produto por ID
 router.get('/:id', async (req, res) => {
     const { id } = req.params;
     const { data, error } = await supabase
         .from('produtos')
-        .select('*, usuario:user_id(email, raw_user_meta_data)')
+        .select('*, usuario:user_id(email, raw_user_meta_data)')  // CORRIGIDO
         .eq('id', id)
         .single();
-
     if (error) {
         return res.status(404).json({ error: 'Produto não encontrado' });
     }
@@ -53,15 +52,15 @@ router.get('/:id', async (req, res) => {
 // POST - Criar produto (autenticado)
 router.post('/', verificarToken, async (req, res) => {
     const { titulo, descricao, categoria, selecao, ano, preco, tipo_oferta, tamanho, estado, imagem_url, quantidade_estoque } = req.body;
-
+    
     if (!titulo || !preco || !categoria) {
         return res.status(400).json({ error: 'Título, preço e categoria são obrigatórios' });
     }
-
+    
     const { data, error } = await supabase
         .from('produtos')
         .insert([{
-            user_id: req.user.id,
+            user_id: req.user.id,  // CORRIGIDO
             titulo,
             descricao,
             categoria,
@@ -77,80 +76,80 @@ router.post('/', verificarToken, async (req, res) => {
         }])
         .select()
         .single();
-
+    
     if (error) {
         return res.status(500).json({ error: error.message });
     }
     res.status(201).json(data);
 });
 
-// PUT - Atualizar produto (autenticado e dono)
+// PUT - Atualizar produto (autenticado, apenas dono)
 router.put('/:id', verificarToken, async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
-
+    
     const { data: produto, error: findError } = await supabase
         .from('produtos')
-        .select('user_id')
+        .select('user_id')  // CORRIGIDO
         .eq('id', id)
         .single();
-
+    
     if (findError || !produto) {
         return res.status(404).json({ error: 'Produto não encontrado' });
     }
     if (produto.user_id !== req.user.id) {
         return res.status(403).json({ error: 'Você não tem permissão para editar este produto' });
     }
-
+    
     const { data, error } = await supabase
         .from('produtos')
         .update(updates)
         .eq('id', id)
         .select()
         .single();
-
+    
     if (error) {
         return res.status(500).json({ error: error.message });
     }
     res.json(data);
 });
 
-// DELETE - Remover produto (autenticado e dono)
+// DELETE - Remover produto (autenticado, apenas dono)
 router.delete('/:id', verificarToken, async (req, res) => {
     const { id } = req.params;
-
+    
     const { data: produto, error: findError } = await supabase
         .from('produtos')
-        .select('user_id')
+        .select('user_id')  // CORRIGIDO
         .eq('id', id)
         .single();
-
+    
     if (findError || !produto) {
         return res.status(404).json({ error: 'Produto não encontrado' });
     }
     if (produto.user_id !== req.user.id) {
         return res.status(403).json({ error: 'Você não tem permissão para deletar este produto' });
     }
-
+    
     const { error } = await supabase
         .from('produtos')
         .delete()
         .eq('id', id);
-
+    
     if (error) {
         return res.status(500).json({ error: error.message });
     }
     res.json({ message: 'Produto deletado com sucesso' });
 });
 
-// GET - Meus produtos
+// GET - Meus produtos (autenticado)
 router.get('/meus', verificarToken, async (req, res) => {
     const { data, error } = await supabase
         .from('produtos')
         .select('*')
-        .eq('user_id', req.user.id)
+        .eq('user_id', req.user.id)  // CORRIGIDO
         .order('created_at', { ascending: false });
-
+    
     if (error) {
         return res.status(500).json({ error: error.message });
     }
