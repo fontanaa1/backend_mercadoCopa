@@ -42,7 +42,7 @@ router.post('/', async (req, res) => {
 
     const numeroPedido = 'MC-' + new Date().getFullYear() + '-' + Math.floor(Math.random() * 10000).toString().padStart(4, '0');
 
-    // Inserir pedido com supabaseAdmin
+    // Inserir pedido com supabaseAdmin (SEM endereco_id, apenas endereco_entrega)
     const { data: pedido, error: pedidoError } = await supabaseAdmin
         .from('pedidos')
         .insert([{
@@ -51,8 +51,7 @@ router.post('/', async (req, res) => {
             total: total,
             forma_pagamento: forma_pagamento,
             status: 'processando',
-            endereco_id: endereco_id || null,
-            endereco_entrega: enderecoData
+            endereco_entrega: enderecoData  // apenas este campo
         }])
         .select()
         .single();
