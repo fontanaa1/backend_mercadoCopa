@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { supabase } = require('../../data/supabase.js');
+const { supabase, supabaseAdmin } = require('../../data/supabase.js');
 const { verificarToken } = require('../middlewares/auth.js');
 
 router.use(verificarToken);
 
-// GET - Listar carrinho
+// GET - Listar carrinho (leitura com supabase normal, RLS filtra pelo usuário)
 router.get('/', async (req, res) => {
     const { data, error } = await supabase
         .from('carrinho_itens')
@@ -20,7 +20,7 @@ router.get('/', async (req, res) => {
     res.json({ itens: data, total });
 });
 
-// POST - Adicionar item ao carrinho
+// POST - Adicionar item (escrita com supabaseAdmin para bypass RLS)
 router.post('/', async (req, res) => {
     const { produto_id, quantidade } = req.body;
     if (!produto_id) {
@@ -48,7 +48,7 @@ router.post('/', async (req, res) => {
 
     if (existing) {
         const novaQuantidade = existing.quantidade + (quantidade || 1);
-        const { data, error } = await supabase
+        const { data, error } = await supabaseAdmin
             .from('carrinho_itens')
             .update({ quantidade: novaQuantidade })
             .eq('id', existing.id)
@@ -61,7 +61,7 @@ router.post('/', async (req, res) => {
         return res.json(data);
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
         .from('carrinho_itens')
         .insert([{
             usuario_id: req.user.id,
@@ -86,7 +86,7 @@ router.put('/:itemId', async (req, res) => {
         return res.status(400).json({ error: 'Quantidade inválida' });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
         .from('carrinho_itens')
         .update({ quantidade })
         .eq('id', itemId)
@@ -103,7 +103,7 @@ router.put('/:itemId', async (req, res) => {
 // DELETE - Remover item específico
 router.delete('/:itemId', async (req, res) => {
     const { itemId } = req.params;
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
         .from('carrinho_itens')
         .delete()
         .eq('id', itemId)
@@ -117,7 +117,7 @@ router.delete('/:itemId', async (req, res) => {
 
 // DELETE - Limpar carrinho
 router.delete('/', async (req, res) => {
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
         .from('carrinho_itens')
         .delete()
         .eq('usuario_id', req.user.id);

@@ -1,9 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { supabase } = require('../../data/supabase.js');
+const { supabase, supabaseAdmin } = require('../../data/supabase.js');
 const { verificarToken } = require('../middlewares/auth.js');
 
-// Todas as rotas de endereço exigem autenticação
 router.use(verificarToken);
 
 // GET - Listar endereços do usuário
@@ -38,13 +37,13 @@ router.post('/', async (req, res) => {
     }
 
     if (principal) {
-        await supabase
+        await supabaseAdmin
             .from('enderecos')
             .update({ principal: false })
             .eq('usuario_id', req.user.id);
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
         .from('enderecos')
         .insert([{
             usuario_id: req.user.id,
@@ -81,14 +80,14 @@ router.put('/:id', async (req, res) => {
     }
 
     if (principal) {
-        await supabase
+        await supabaseAdmin
             .from('enderecos')
             .update({ principal: false })
             .eq('usuario_id', req.user.id)
             .neq('id', id);
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
         .from('enderecos')
         .update({
             nome_completo,
@@ -113,7 +112,7 @@ router.put('/:id', async (req, res) => {
 // DELETE - Remover endereço
 router.delete('/:id', async (req, res) => {
     const { id } = req.params;
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
         .from('enderecos')
         .delete()
         .eq('id', id)

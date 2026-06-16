@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { supabase } = require('../../data/supabase.js');
+const { supabase, supabaseAdmin } = require('../../data/supabase.js');
 const { verificarToken } = require('../middlewares/auth.js');
 
 router.use(verificarToken);
@@ -42,7 +42,8 @@ router.post('/', async (req, res) => {
 
     const numeroPedido = 'MC-' + new Date().getFullYear() + '-' + Math.floor(Math.random() * 10000).toString().padStart(4, '0');
 
-    const { data: pedido, error: pedidoError } = await supabase
+    // Inserir pedido com supabaseAdmin
+    const { data: pedido, error: pedidoError } = await supabaseAdmin
         .from('pedidos')
         .insert([{
             usuario_id: req.user.id,
@@ -57,17 +58,18 @@ router.post('/', async (req, res) => {
         .single();
     if (pedidoError) return res.status(500).json({ error: pedidoError.message });
 
+    // Inserir itens do pedido
     const itensPedido = items.map(item => ({
         pedido_id: pedido.id,
         produto_id: item.produto_id,
         quantidade: item.quantidade,
         preco_unitario: item.preco_unitario
     }));
-    const { error: itensError } = await supabase
+    const { error: itensError } = await supabaseAdmin
         .from('pedido_itens')
         .insert(itensPedido);
     if (itensError) {
-        await supabase.from('pedidos').delete().eq('id', pedido.id);
+        await supabaseAdmin.from('pedidos').delete().eq('id', pedido.id);
         return res.status(500).json({ error: itensError.message });
     }
 
@@ -79,7 +81,7 @@ router.post('/', async (req, res) => {
             .eq('id', item.produto_id)
             .single();
         if (produto) {
-            await supabase
+            await supabaseAdmin
                 .from('produtos')
                 .update({
                     quantidade_estoque: Math.max(0, produto.quantidade_estoque - item.quantidade),
