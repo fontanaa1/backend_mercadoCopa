@@ -3,7 +3,7 @@ const router = express.Router();
 const { supabase, supabaseAdmin } = require('../../data/supabase.js');
 const { verificarToken } = require('../middlewares/auth.js');
 
-// GET - Listar produtos (público) - SEM JOIN para evitar erro de relacionamento
+// GET - Listar produtos (público) - com busca de usuário via Admin API
 router.get('/', async (req, res) => {
     const { categoria, busca, minPreco, maxPreco, tipo_oferta } = req.query;
     
@@ -33,21 +33,26 @@ router.get('/', async (req, res) => {
         return res.status(500).json({ error: error.message });
     }
 
-    // Buscar dados dos usuários para preencher "usuario"
+    // Buscar dados dos usuários via Admin API
     if (produtos && produtos.length > 0) {
         const userIds = [...new Set(produtos.map(p => p.usuario_id).filter(id => id))];
         if (userIds.length > 0) {
-            const { data: users, error: userError } = await supabase
-                .from('auth.users')
-                .select('id, email, raw_user_meta_data')
-                .in('id', userIds);
-            
-            if (!userError && users) {
-                const userMap = Object.fromEntries(users.map(u => [u.id, u]));
-                produtos.forEach(p => {
-                    p.usuario = userMap[p.usuario_id] || null;
-                });
-            }
+            const userPromises = userIds.map(id => supabaseAdmin.auth.admin.getUserById(id));
+            const userResults = await Promise.all(userPromises);
+            const userMap = {};
+            userResults.forEach(res => {
+                if (!res.error && res.data && res.data.user) {
+                    const u = res.data.user;
+                    userMap[u.id] = {
+                        id: u.id,
+                        email: u.email,
+                        raw_user_meta_data: u.user_metadata
+                    };
+                }
+            });
+            produtos.forEach(p => {
+                p.usuario = userMap[p.usuario_id] || null;
+            });
         }
     }
 
@@ -81,14 +86,15 @@ router.get('/:id', async (req, res) => {
         return res.status(404).json({ error: 'Produto não encontrado' });
     }
 
+    // Buscar usuário via Admin API
     if (produto.usuario_id) {
-        const { data: user, error: userError } = await supabase
-            .from('auth.users')
-            .select('id, email, raw_user_meta_data')
-            .eq('id', produto.usuario_id)
-            .single();
-        if (!userError && user) {
-            produto.usuario = user;
+        const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(produto.usuario_id);
+        if (!userError && userData && userData.user) {
+            produto.usuario = {
+                id: userData.user.id,
+                email: userData.user.email,
+                raw_user_meta_data: userData.user.user_metadata
+            };
         }
     }
 
