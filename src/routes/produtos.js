@@ -3,13 +3,13 @@ const router = express.Router();
 const { supabase } = require('../../data/supabase.js');
 const { verificarToken } = require('../middlewares/auth.js');
 
-// GET - Listar produtos (público) - sem JOIN
+// GET - Listar produtos (público) - com relacionamento usando FK
 router.get('/', async (req, res) => {
     const { categoria, busca, minPreco, maxPreco, tipo_oferta } = req.query;
     
     let query = supabase
         .from('produtos')
-        .select('*')
+        .select('*, usuario:usuario_id(email, raw_user_meta_data)')
         .eq('disponivel', true);
     
     if (categoria && categoria !== 'todos') {
@@ -28,57 +28,25 @@ router.get('/', async (req, res) => {
         query = query.ilike('titulo', `%${busca}%`);
     }
     
-    const { data: produtos, error } = await query.order('created_at', { ascending: false });
+    const { data, error } = await query.order('created_at', { ascending: false });
     if (error) {
         return res.status(500).json({ error: error.message });
     }
-
-    // Buscar dados dos usuários manualmente
-    if (produtos && produtos.length > 0) {
-        const userIds = [...new Set(produtos.map(p => p.user_id).filter(id => id))];
-        if (userIds.length > 0) {
-            const { data: users, error: userError } = await supabase
-                .from('auth.users')
-                .select('id, email, raw_user_meta_data')
-                .in('id', userIds);
-            
-            if (!userError && users) {
-                const userMap = Object.fromEntries(users.map(u => [u.id, u]));
-                produtos.forEach(p => {
-                    p.usuario = userMap[p.user_id] || null;
-                });
-            }
-        }
-    }
-
-    res.json(produtos);
+    res.json(data);
 });
 
 // GET - Buscar produto por ID
 router.get('/:id', async (req, res) => {
     const { id } = req.params;
-    const { data: produto, error } = await supabase
+    const { data, error } = await supabase
         .from('produtos')
-        .select('*')
+        .select('*, usuario:usuario_id(email, raw_user_meta_data)')
         .eq('id', id)
         .single();
-    
     if (error) {
         return res.status(404).json({ error: 'Produto não encontrado' });
     }
-
-    if (produto.user_id) {
-        const { data: user, error: userError } = await supabase
-            .from('auth.users')
-            .select('id, email, raw_user_meta_data')
-            .eq('id', produto.user_id)
-            .single();
-        if (!userError && user) {
-            produto.usuario = user;
-        }
-    }
-
-    res.json(produto);
+    res.json(data);
 });
 
 // POST - Criar produto (autenticado)
@@ -92,7 +60,7 @@ router.post('/', verificarToken, async (req, res) => {
     const { data, error } = await supabase
         .from('produtos')
         .insert([{
-            user_id: req.user.id,
+            usuario_id: req.user.id,  // CORRIGIDO: agora é usuario_id
             titulo,
             descricao,
             categoria,
@@ -115,21 +83,21 @@ router.post('/', verificarToken, async (req, res) => {
     res.status(201).json(data);
 });
 
-// PUT - Atualizar produto (autenticado, apenas dono)
+// PUT - Atualizar produto
 router.put('/:id', verificarToken, async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
     
     const { data: produto, error: findError } = await supabase
         .from('produtos')
-        .select('user_id')
+        .select('usuario_id')
         .eq('id', id)
         .single();
     
     if (findError || !produto) {
         return res.status(404).json({ error: 'Produto não encontrado' });
     }
-    if (produto.user_id !== req.user.id) {
+    if (produto.usuario_id !== req.user.id) {
         return res.status(403).json({ error: 'Você não tem permissão para editar este produto' });
     }
     
@@ -146,20 +114,20 @@ router.put('/:id', verificarToken, async (req, res) => {
     res.json(data);
 });
 
-// DELETE - Remover produto (autenticado, apenas dono)
+// DELETE - Remover produto
 router.delete('/:id', verificarToken, async (req, res) => {
     const { id } = req.params;
     
     const { data: produto, error: findError } = await supabase
         .from('produtos')
-        .select('user_id')
+        .select('usuario_id')
         .eq('id', id)
         .single();
     
     if (findError || !produto) {
         return res.status(404).json({ error: 'Produto não encontrado' });
     }
-    if (produto.user_id !== req.user.id) {
+    if (produto.usuario_id !== req.user.id) {
         return res.status(403).json({ error: 'Você não tem permissão para deletar este produto' });
     }
     
@@ -179,7 +147,7 @@ router.get('/meus', verificarToken, async (req, res) => {
     const { data, error } = await supabase
         .from('produtos')
         .select('*')
-        .eq('user_id', req.user.id)
+        .eq('usuario_id', req.user.id)
         .order('created_at', { ascending: false });
     
     if (error) {
