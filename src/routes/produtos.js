@@ -9,7 +9,7 @@ router.get('/', async (req, res) => {
     
     let query = supabase
         .from('produtos')
-        .select('*')  // sem join
+        .select('*')
         .eq('disponivel', true);
     
     if (categoria && categoria !== 'todos') {
@@ -67,7 +67,6 @@ router.get('/:id', async (req, res) => {
         return res.status(404).json({ error: 'Produto não encontrado' });
     }
 
-    // Buscar dados do usuário
     if (produto.user_id) {
         const { data: user, error: userError } = await supabase
             .from('auth.users')
