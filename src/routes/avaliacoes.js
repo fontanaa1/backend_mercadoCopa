@@ -3,15 +3,33 @@ const router = express.Router();
 const { supabase, supabaseAdmin } = require('../../data/supabase.js');
 const { verificarToken } = require('../middlewares/auth.js');
 
-// GET - Avaliações de um vendedor (público)
+// GET - Avaliações de um vendedor (público) com busca de compradores via Admin API
 router.get('/vendedor/:vendedorId', async (req, res) => {
     const { vendedorId } = req.params;
     const { data, error } = await supabase
         .from('avaliacoes')
-        .select('*, comprador:comprador_id(email, raw_user_meta_data)')
+        .select('*')
         .eq('vendedor_id', vendedorId)
         .order('created_at', { ascending: false });
     if (error) return res.status(500).json({ error: error.message });
+
+    if (data && data.length > 0) {
+        const compradorIds = [...new Set(data.map(a => a.comprador_id).filter(id => id))];
+        if (compradorIds.length > 0) {
+            const userPromises = compradorIds.map(id => supabaseAdmin.auth.admin.getUserById(id));
+            const userResults = await Promise.all(userPromises);
+            const userMap = {};
+            userResults.forEach(res => {
+                if (!res.error && res.data && res.data.user) {
+                    const u = res.data.user;
+                    userMap[u.id] = { id: u.id, email: u.email, raw_user_meta_data: u.user_metadata };
+                }
+            });
+            data.forEach(a => {
+                a.comprador = userMap[a.comprador_id] || null;
+            });
+        }
+    }
     res.json(data);
 });
 
