@@ -35,7 +35,7 @@ router.get('/', async (req, res) => {
 
     // Buscar dados dos usuários para preencher "usuario"
     if (produtos && produtos.length > 0) {
-        const userIds = [...new Set(produtos.map(p => p.user_id).filter(id => id))];
+        const userIds = [...new Set(produtos.map(p => p.usuario_id).filter(id => id))];
         if (userIds.length > 0) {
             const { data: users, error: userError } = await supabase
                 .from('auth.users')
@@ -45,13 +45,27 @@ router.get('/', async (req, res) => {
             if (!userError && users) {
                 const userMap = Object.fromEntries(users.map(u => [u.id, u]));
                 produtos.forEach(p => {
-                    p.usuario = userMap[p.user_id] || null;
+                    p.usuario = userMap[p.usuario_id] || null;
                 });
             }
         }
     }
 
     res.json(produtos);
+});
+
+// GET - Meus produtos (usando supabaseAdmin para garantir retorno)
+router.get('/meus', verificarToken, async (req, res) => {
+    const { data, error } = await supabaseAdmin
+        .from('produtos')
+        .select('*')
+        .eq('usuario_id', req.user.id)
+        .order('created_at', { ascending: false });
+    
+    if (error) {
+        return res.status(500).json({ error: error.message });
+    }
+    res.json(data);
 });
 
 // GET - Buscar produto por ID
@@ -67,11 +81,11 @@ router.get('/:id', async (req, res) => {
         return res.status(404).json({ error: 'Produto não encontrado' });
     }
 
-    if (produto.user_id) {
+    if (produto.usuario_id) {
         const { data: user, error: userError } = await supabase
             .from('auth.users')
             .select('id, email, raw_user_meta_data')
-            .eq('id', produto.user_id)
+            .eq('id', produto.usuario_id)
             .single();
         if (!userError && user) {
             produto.usuario = user;
@@ -92,7 +106,7 @@ router.post('/', verificarToken, async (req, res) => {
     const { data, error } = await supabaseAdmin
         .from('produtos')
         .insert([{
-            user_id: req.user.id,
+            usuario_id: req.user.id,
             titulo,
             descricao,
             categoria,
@@ -122,14 +136,14 @@ router.put('/:id', verificarToken, async (req, res) => {
     
     const { data: produto, error: findError } = await supabase
         .from('produtos')
-        .select('user_id')
+        .select('usuario_id')
         .eq('id', id)
         .single();
     
     if (findError || !produto) {
         return res.status(404).json({ error: 'Produto não encontrado' });
     }
-    if (produto.user_id !== req.user.id) {
+    if (produto.usuario_id !== req.user.id) {
         return res.status(403).json({ error: 'Você não tem permissão para editar este produto' });
     }
     
@@ -152,14 +166,14 @@ router.delete('/:id', verificarToken, async (req, res) => {
     
     const { data: produto, error: findError } = await supabase
         .from('produtos')
-        .select('user_id')
+        .select('usuario_id')
         .eq('id', id)
         .single();
     
     if (findError || !produto) {
         return res.status(404).json({ error: 'Produto não encontrado' });
     }
-    if (produto.user_id !== req.user.id) {
+    if (produto.usuario_id !== req.user.id) {
         return res.status(403).json({ error: 'Você não tem permissão para deletar este produto' });
     }
     
@@ -172,20 +186,6 @@ router.delete('/:id', verificarToken, async (req, res) => {
         return res.status(500).json({ error: error.message });
     }
     res.json({ message: 'Produto deletado com sucesso' });
-});
-
-// GET - Meus produtos (usando supabaseAdmin para garantir retorno)
-router.get('/meus', verificarToken, async (req, res) => {
-    const { data, error } = await supabaseAdmin
-        .from('produtos')
-        .select('*')
-        .eq('user_id', req.user.id)
-        .order('created_at', { ascending: false });
-    
-    if (error) {
-        return res.status(500).json({ error: error.message });
-    }
-    res.json(data);
 });
 
 module.exports = router;
