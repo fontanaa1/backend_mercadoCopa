@@ -29,7 +29,9 @@ router.get('/', async (req, res) => {
     }
     
     const { data: produtos, error } = await query.order('created_at', { ascending: false });
+    
     if (error) {
+        console.error('Erro ao listar produtos:', error);
         return res.status(500).json({ error: error.message });
     }
 
@@ -37,22 +39,27 @@ router.get('/', async (req, res) => {
     if (produtos && produtos.length > 0) {
         const userIds = [...new Set(produtos.map(p => p.usuario_id).filter(id => id))];
         if (userIds.length > 0) {
-            const userPromises = userIds.map(id => supabaseAdmin.auth.admin.getUserById(id));
-            const userResults = await Promise.all(userPromises);
-            const userMap = {};
-            userResults.forEach(res => {
-                if (!res.error && res.data && res.data.user) {
-                    const u = res.data.user;
-                    userMap[u.id] = {
-                        id: u.id,
-                        email: u.email,
-                        raw_user_meta_data: u.user_metadata
-                    };
-                }
-            });
-            produtos.forEach(p => {
-                p.usuario = userMap[p.usuario_id] || null;
-            });
+            try {
+                const userPromises = userIds.map(id => supabaseAdmin.auth.admin.getUserById(id));
+                const userResults = await Promise.all(userPromises);
+                const userMap = {};
+                userResults.forEach(res => {
+                    if (!res.error && res.data && res.data.user) {
+                        const u = res.data.user;
+                        userMap[u.id] = {
+                            id: u.id,
+                            email: u.email,
+                            raw_user_meta_data: u.user_metadata
+                        };
+                    }
+                });
+                produtos.forEach(p => {
+                    p.usuario = userMap[p.usuario_id] || null;
+                });
+            } catch (err) {
+                console.error('Erro ao buscar dados dos usuários:', err);
+                // Continua sem os dados do usuário
+            }
         }
     }
 
@@ -68,6 +75,7 @@ router.get('/meus', verificarToken, async (req, res) => {
         .order('created_at', { ascending: false });
     
     if (error) {
+        console.error('Erro ao buscar meus produtos:', error);
         return res.status(500).json({ error: error.message });
     }
     res.json(data);
@@ -76,6 +84,7 @@ router.get('/meus', verificarToken, async (req, res) => {
 // GET - Buscar produto por ID
 router.get('/:id', async (req, res) => {
     const { id } = req.params;
+    
     const { data: produto, error } = await supabase
         .from('produtos')
         .select('*')
@@ -83,18 +92,23 @@ router.get('/:id', async (req, res) => {
         .single();
     
     if (error) {
+        console.error('Erro ao buscar produto por ID:', error);
         return res.status(404).json({ error: 'Produto não encontrado' });
     }
 
     // Buscar usuário via Admin API
     if (produto.usuario_id) {
-        const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(produto.usuario_id);
-        if (!userError && userData && userData.user) {
-            produto.usuario = {
-                id: userData.user.id,
-                email: userData.user.email,
-                raw_user_meta_data: userData.user.user_metadata
-            };
+        try {
+            const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(produto.usuario_id);
+            if (!userError && userData && userData.user) {
+                produto.usuario = {
+                    id: userData.user.id,
+                    email: userData.user.email,
+                    raw_user_meta_data: userData.user.user_metadata
+                };
+            }
+        } catch (err) {
+            console.error('Erro ao buscar usuário do produto:', err);
         }
     }
 
@@ -103,7 +117,19 @@ router.get('/:id', async (req, res) => {
 
 // POST - Criar produto
 router.post('/', verificarToken, async (req, res) => {
-    const { titulo, descricao, categoria, selecao, ano, preco, tipo_oferta, tamanho, estado, imagem_url, quantidade_estoque } = req.body;
+    const { 
+        titulo, 
+        descricao, 
+        categoria, 
+        selecao, 
+        ano, 
+        preco, 
+        tipo_oferta, 
+        tamanho, 
+        estado, 
+        imagem_url, 
+        quantidade_estoque 
+    } = req.body;
     
     if (!titulo || !preco || !categoria) {
         return res.status(400).json({ error: 'Título, preço e categoria são obrigatórios' });
@@ -114,22 +140,23 @@ router.post('/', verificarToken, async (req, res) => {
         .insert([{
             usuario_id: req.user.id,
             titulo,
-            descricao,
+            descricao: descricao || null,
             categoria,
-            selecao,
-            ano,
-            preco,
+            selecao: selecao || null,
+            ano: ano || null,
+            preco: parseFloat(preco),
             tipo_oferta: tipo_oferta || 'venda',
-            tamanho,
-            estado,
+            tamanho: tamanho || null,
+            estado: estado || 'Excelente',
             imagem_url: imagem_url || null,
-            quantidade_estoque: quantidade_estoque || 1,
+            quantidade_estoque: parseInt(quantidade_estoque) || 1,
             disponivel: true
         }])
         .select()
         .single();
     
     if (error) {
+        console.error('Erro ao criar produto:', error);
         return res.status(500).json({ error: error.message });
     }
     res.status(201).json(data);
@@ -140,6 +167,7 @@ router.put('/:id', verificarToken, async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
     
+    // Verificar se o produto existe e pertence ao usuário
     const { data: produto, error: findError } = await supabase
         .from('produtos')
         .select('usuario_id')
@@ -155,12 +183,16 @@ router.put('/:id', verificarToken, async (req, res) => {
     
     const { data, error } = await supabaseAdmin
         .from('produtos')
-        .update(updates)
+        .update({
+            ...updates,
+            updated_at: new Date()
+        })
         .eq('id', id)
         .select()
         .single();
     
     if (error) {
+        console.error('Erro ao atualizar produto:', error);
         return res.status(500).json({ error: error.message });
     }
     res.json(data);
@@ -170,6 +202,7 @@ router.put('/:id', verificarToken, async (req, res) => {
 router.delete('/:id', verificarToken, async (req, res) => {
     const { id } = req.params;
     
+    // Verificar se o produto existe e pertence ao usuário
     const { data: produto, error: findError } = await supabase
         .from('produtos')
         .select('usuario_id')
@@ -189,6 +222,7 @@ router.delete('/:id', verificarToken, async (req, res) => {
         .eq('id', id);
     
     if (error) {
+        console.error('Erro ao deletar produto:', error);
         return res.status(500).json({ error: error.message });
     }
     res.json({ message: 'Produto deletado com sucesso' });
